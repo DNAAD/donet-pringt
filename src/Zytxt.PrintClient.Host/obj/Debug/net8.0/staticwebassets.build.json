@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "fNuX12S0oqniMG80FjhPEYCCFxU/SnkrBBxpyXtkOig=",
+  "Source": "Zytxt.PrintClient.Host",
+  "BasePath": "_content/Zytxt.PrintClient.Host",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Zytxt.PrintClient.Host/1.0.0": {
+        "dependencies": {
+          "Zytxt.PrintClient.Core": "1.0.0"
+        },
+        "runtime": {
+          "Zytxt.PrintClient.Host.dll": {}
+        }
+      },
+      "Zytxt.PrintClient.Core/1.0.0": {
+        "runtime": {
+          "Zytxt.PrintClient.Core.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Zytxt.PrintClient.Host/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Zytxt.PrintClient.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

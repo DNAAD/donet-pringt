@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>80mm x 30mm 标签预览</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #f3f6f8;
+      font-family: "Microsoft YaHei", "SimHei", Arial, sans-serif;
+      color: #111;
+    }
+    .page-title {
+      margin: 0 0 16px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .label {
+      position: relative;
+      width: 80mm;
+      height: 30mm;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid #b6c2cc;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    }
+    .content {
+      width: 27mm;
+      height: 100%;
+      padding: 0.8mm 0 0 0.8mm;
+    }
+    .identifier {
+      margin: 0 0 0.8mm;
+      font-size: 5pt;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .top {
+      display: grid;
+      grid-template-columns: 9mm 16mm;
+      gap: 1mm;
+      height: 10.5mm;
+    }
+    .quality {
+      display: grid;
+      grid-template-columns: 2.2mm 6.5mm;
+      gap: 0.3mm;
+      align-items: center;
+    }
+    .quality-text {
+      margin: 0;
+      font-size: 5pt;
+      line-height: 1.25;
+      word-break: break-all;
+    }
+    .qr-placeholder {
+      width: 6.5mm;
+      height: 6.5mm;
+      border: 0.3mm solid #111;
+      display: grid;
+      place-items: center;
+      font-size: 3.2pt;
+      font-weight: 700;
+    }
+    .product {
+      margin: 0;
+      font-size: 5pt;
+      line-height: 1.15;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .line {
+      margin: 0;
+      font-size: 4.6pt;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+    .sales {
+      margin-top: 0.6mm;
+      font-size: 4.8pt;
+      font-weight: 700;
+    }
+    .rotate-code {
+      position: absolute;
+      left: 23mm;
+      top: 16mm;
+      margin: 0;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 4.8pt;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">.NET POC 标签预览：80mm x 30mm</h1>
+  <article class="label">
+    <section class="content">
+      <p class="identifier">10000000789</p>
+      <section class="top">
+        <div>
+          <div class="quality">
+            <p class="quality-text">合格证</p>
+            <div class="qr-placeholder">QR</div>
+          </div>
+          <p class="line">标签约0.20g</p>
+        </div>
+        <div>
+          <p class="product">足金镶嵌吊坠</p>
+          <p class="line">成品重(g): 3.20</p>
+          <p class="line">总件重(g): 3.56</p>
+        </div>
+      </section>
+      <p class="line">执行标准: QB/T2062  足金999</p>
+      <p class="line">地址:深圳水贝</p>
+      <p class="sales">XS-001</p>
+    </section>
+    <p class="rotate-code">10000000789</p>
+  </article>
+</body>
+</html>
