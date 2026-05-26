@@ -2,6 +2,9 @@ namespace Zytxt.PrintClient.Core.Labels;
 
 public sealed class LabelItem
 {
+    [System.Text.Json.Serialization.JsonNumberHandling(System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString)]
+    public int? FactoryNo { get; set; }
+
     public string IdentifierCode { get; set; } = "";
 
     public string ProductName { get; set; } = "";
@@ -18,7 +21,11 @@ public sealed class LabelItem
 
     public string Address { get; set; } = "";
 
+    public decimal Price { get; set; }
+
     public decimal AdditionalPrice { get; set; }
+
+    public decimal TagWeight { get; set; }
 
     public string CategoryName { get; set; } = "";
 

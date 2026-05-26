@@ -3,34 +3,25 @@ using Zytxt.PrintClient.Core.Settings;
 
 namespace Zytxt.PrintClient.Core.NativeDrawing;
 
-public sealed class NativeLabelDrawingPlanner
+internal sealed class SilverNativeLabelDrawingPlanner
 {
-    private readonly SilverNativeLabelDrawingPlanner silverPlanner = new();
-
     public NativeLabelDrawingPlan CreatePlan(LabelRenderPlan labelPlan, LabelOffset? offset = null)
     {
-        if (labelPlan.TemplateKey == LabelTemplateKey.Silver80x30)
-        {
-            return silverPlanner.CreatePlan(labelPlan, offset);
-        }
-
         var offsetX = offset?.X ?? 0m;
         var offsetY = offset?.Y ?? 0m;
         var commands = new List<NativeDrawCommand>
         {
             Text(0m + offsetX, 0m + offsetY, 9.2m, 1.5m, labelPlan.IdentifierText, 4.5m, bold: false),
-            Text(0m + offsetX, 2.5m + offsetY, 2m, 8.5m, "合格证", 4.6m, bold: false),
-            QrCode(1.8m + offsetX, 1m + offsetY, 9m, labelPlan.QrPayload),
-            Text(1.8m + offsetX, 9m + offsetY, 9m, 1.2m, "标签约0.20g", 3.6m, bold: false),
-            Text(10.2m + offsetX, 0m + offsetY, 16.3m, 6.7m, labelPlan.ProductName, 4.2m, bold: false, maxLines: 3, ellipsis: true),
-            Text(0m + offsetX, 10.8m + offsetY, 26m, 1.8m, labelPlan.StandardText, 3.4m, bold: false),
-            Text(0m + offsetX, 12.05m + offsetY, 26m, 1.8m, labelPlan.AddressText, 4.0m, bold: false),
+            Text(0m + offsetX, 2.8m + offsetY, 1.5m, 8.5m, "合格证", 4.6m, bold: false),
+            QrCode(1.8m + offsetX, 1.5m + offsetY, 8.8m, labelPlan.QrPayload),
+            Text(10.2m + offsetX, 0m + offsetY, 15.2m, 6.7m, labelPlan.ProductName, 4.2m, bold: false, maxLines: 3, ellipsis: true),
+            Text(0m + offsetX, 10.8m + offsetY, 26m, 1.8m, $"{labelPlan.StandardText}  标签约0.20g", 3.4m, bold: false),
+            Text(16m + offsetX, 12.05m + offsetY, 10m, 1.8m, labelPlan.PriceText, 4.5m, bold: true),
             Text(0m + offsetX, 14.6m + offsetY, 9m, 1.8m, labelPlan.SalesCode, 4.2m, bold: false)
         };
 
         AddWeightCommands(commands, labelPlan.FinishedWeightText, 10.2m + offsetX, 6.85m + offsetY);
         AddWeightCommands(commands, labelPlan.RoughWeightText, 10.2m + offsetX, 8.8m + offsetY);
-
         if (!string.IsNullOrWhiteSpace(labelPlan.AdditionalPriceText))
         {
             commands.Add(Text(12m + offsetX, 14.6m + offsetY, 12m, 1.8m, labelPlan.AdditionalPriceText, 4.2m, bold: false));
@@ -64,7 +55,7 @@ public sealed class NativeLabelDrawingPlanner
                 y + offsetY,
                 11m,
                 1.8m,
-                $"{part.CategoryName}:{part.PartWeightText}g",
+                $"{part.CategoryName}:{part.PartWeightText}",
                 4.0m,
                 bold: false));
         }
@@ -75,14 +66,15 @@ public sealed class NativeLabelDrawingPlanner
         var splitIndex = text.LastIndexOf(' ');
         if (splitIndex < 0 || splitIndex == text.Length - 1)
         {
-            commands.Add(Text(x, y, 15.2m, 1.8m, text, 4.5m, bold: false));
+            commands.Add(Text(x, y, 15.2m, 1.8m, text, 4.8m, bold: false));
             return;
         }
 
         var label = text[..(splitIndex + 1)];
         var value = text[(splitIndex + 1)..];
-        commands.Add(Text(x, y, 7.8m, 1.8m, label, 4.0m, bold: false));
-        commands.Add(Text(x + 7.9m, y - 0.08m, 7.3m, 1.9m, value, 4.5m, bold: true));
+        commands.Add(Text(x, y + 0.18m, 7.8m, 1.8m, label, 3.9m, bold: false));
+        // commands.Add(Text(x + 7.9m, y - 0.32m, 7.3m, 2.4m, value, 4.8m, bold: true));
+        commands.Add(Text(x + 7.9m, y - 0.08m, 7.3m, 1.9m, value, 4.8m, bold: true));
     }
 
     private static decimal CalculateFooterY(LabelRenderPlan labelPlan)

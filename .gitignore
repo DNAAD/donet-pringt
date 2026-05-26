@@ -1,2 +1,12 @@
 .runtime-preview/
-tests/
+.idea/
+.superpowers/
+.build/
+bin/
+obj/
+**/bin/
+**/obj/
+**/publish/
+.runtime-cors-settings-test/
+.runtime-pna-test/
+.runtime-port-conflict-test/

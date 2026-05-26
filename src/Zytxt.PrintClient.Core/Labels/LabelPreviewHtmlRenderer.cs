@@ -179,7 +179,7 @@ public sealed class LabelPreviewHtmlRenderer
 </head>
 <body>
   <h1 class="page-title">.NET POC 标签预览：80mm x 30mm</h1>
-  <article class="label-root">
+  <article class="{{RootClass(plan)}}">
     <section class="content-band">
       <section class="top-row">
         <div class="top-left">
@@ -188,7 +188,7 @@ public sealed class LabelPreviewHtmlRenderer
             <p class="quality-mark">合格证</p>
             <div class="qr-box">{{RenderQrSvg(plan.QrPayload)}}</div>
           </div>
-          <p class="qr-note">标签约<span class="number">0.20</span>g</p>
+          {{RenderQrNote(plan)}}
         </div>
         <div class="top-right">
           <p class="product-name">{{Encode(plan.ProductName)}}</p>
@@ -198,8 +198,9 @@ public sealed class LabelPreviewHtmlRenderer
           </div>
         </div>
       </section>
-      <section class="middle-line">{{Encode(plan.StandardText)}}</section>
-      <section class="middle-line address-line">{{Encode(plan.AddressText)}}</section>
+      <section class="middle-line">{{Encode(RenderStandardLine(plan))}}</section>
+      {{RenderAddressLine(plan)}}
+      {{RenderPriceLine(plan)}}
       <section class="sales-code">
         <p class="number">{{Encode(plan.SalesCode)}}</p>
         {{RenderAdditionalPrice(plan.AdditionalPriceText)}}
@@ -224,6 +225,41 @@ public sealed class LabelPreviewHtmlRenderer
         return string.IsNullOrWhiteSpace(value)
             ? ""
             : $"<p class=\"additional-price\">{Encode(value)}</p>";
+    }
+
+    private static string RenderStandardLine(LabelRenderPlan plan)
+    {
+        return plan.TemplateKey == LabelTemplateKey.Silver80x30
+            ? $"{plan.StandardText}  标签约{plan.TagWeightText}g"
+            : plan.StandardText;
+    }
+
+    private static string RenderPriceLine(LabelRenderPlan plan)
+    {
+        return plan.TemplateKey == LabelTemplateKey.Silver80x30 && !string.IsNullOrWhiteSpace(plan.PriceText)
+            ? $"<section class=\"middle-line price-line\"><span class=\"number\">{Encode(plan.PriceText)}</span></section>"
+            : "";
+    }
+
+    private static string RootClass(LabelRenderPlan plan)
+    {
+        return plan.TemplateKey == LabelTemplateKey.Silver80x30
+            ? "label-root silver-template"
+            : "label-root";
+    }
+
+    private static string RenderQrNote(LabelRenderPlan plan)
+    {
+        return plan.TemplateKey == LabelTemplateKey.Silver80x30
+            ? ""
+            : "<p class=\"qr-note\">标签约<span class=\"number\">0.20</span>g</p>";
+    }
+
+    private static string RenderAddressLine(LabelRenderPlan plan)
+    {
+        return plan.TemplateKey == LabelTemplateKey.Silver80x30
+            ? ""
+            : $"<section class=\"middle-line address-line\">{Encode(plan.AddressText)}</section>";
     }
 
     private static string RenderPartColumn(IReadOnlyList<LabelPartRenderPlan> parts, int parity)

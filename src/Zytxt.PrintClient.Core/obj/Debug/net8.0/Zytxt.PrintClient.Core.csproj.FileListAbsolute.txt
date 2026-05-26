@@ -21,3 +21,13 @@ C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\1f411f2b09ae6238\dotnet-print\s
 C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\1f411f2b09ae6238\dotnet-print\src\Zytxt.PrintClient.Core\obj\Debug\net8.0\Zytxt.PrintClient.Core.pdb
 C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\1f411f2b09ae6238\dotnet-print\src\Zytxt.PrintClient.Core\obj\Debug\net8.0\ref\Zytxt.PrintClient.Core.dll
 D:\sales_system\dotnet-print\src\Zytxt.PrintClient.Core\obj\Debug\net8.0\Zytxt.PrintClient.Core.csproj.AssemblyReference.cache
+D:\sales_system\dotnet-print\src\Zytxt.PrintClient.Core\obj\Debug\net8.0\Zytxt.PrintClient.Core.sourcelink.json
+D:\sales_system\dotnet-print\.build\cors-test-bin\Debug\net8.0\Zytxt.PrintClient.Core.deps.json
+D:\sales_system\dotnet-print\.build\cors-test-bin\Debug\net8.0\Zytxt.PrintClient.Core.dll
+D:\sales_system\dotnet-print\.build\cors-test-bin\Debug\net8.0\Zytxt.PrintClient.Core.pdb
+D:\sales_system\dotnet-print\.build\cors-test-bin2\Debug\net8.0\Zytxt.PrintClient.Core.deps.json
+D:\sales_system\dotnet-print\.build\cors-test-bin2\Debug\net8.0\Zytxt.PrintClient.Core.dll
+D:\sales_system\dotnet-print\.build\cors-test-bin2\Debug\net8.0\Zytxt.PrintClient.Core.pdb
+D:\sales_system\dotnet-print\.build\cors-test-bin3\Debug\net8.0\Zytxt.PrintClient.Core.deps.json
+D:\sales_system\dotnet-print\.build\cors-test-bin3\Debug\net8.0\Zytxt.PrintClient.Core.dll
+D:\sales_system\dotnet-print\.build\cors-test-bin3\Debug\net8.0\Zytxt.PrintClient.Core.pdb

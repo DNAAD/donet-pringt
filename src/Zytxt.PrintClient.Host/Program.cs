@@ -5,16 +5,31 @@ using Zytxt.PrintClient.Core.Labels;
 using Zytxt.PrintClient.Core.NativeDrawing;
 using Zytxt.PrintClient.Core.Settings;
 using Zytxt.PrintClient.Host.Printing;
+using Zytxt.PrintClient.Host.Security;
 using Zytxt.PrintClient.Host.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
-var listenUrl = Environment.GetEnvironmentVariable("ZYTXT_PRINT_URL") ?? "http://127.0.0.1:37121";
+var listenUrl = Environment.GetEnvironmentVariable("ZYTXT_PRINT_URL") ?? "http://127.0.0.1:37122";
 builder.WebHost.UseUrls(listenUrl);
-
-var app = builder.Build();
 var dataDir = Environment.GetEnvironmentVariable("ZYTXT_PRINT_DATA_DIR")
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "zytxt-dotnet-print");
 var settingsStore = new FileSettingsStore(Path.Combine(dataDir, "settings.json"));
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(LocalCorsPolicy.PolicyName, policy =>
+    {
+        policy
+            .SetIsOriginAllowed(origin => LocalCorsPolicy.IsAllowedOrigin(origin, settingsStore.Load().AllowedOrigins))
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
+var app = builder.Build();
 var labelPlanner = new LabelRenderPlanner();
 var previewRenderer = new LabelPreviewHtmlRenderer();
 var gdiPreviewPageRenderer = new GdiPreviewPageRenderer();
@@ -23,6 +38,25 @@ var axisDiagnosticDrawingPlanner = new AxisDiagnosticDrawingPlanner();
 var printEngine = new WindowsLabelPrintEngine();
 var printerSelectionResolver = new PrinterSelectionResolver();
 var settingsPageRenderer = new SettingsPageRenderer();
+
+app.Use(async (context, next) =>
+{
+    if (PrivateNetworkAccessPolicy.ShouldAllow(
+        context.Request.Headers[PrivateNetworkAccessPolicy.RequestHeaderName].ToString(),
+        context.Request.Headers.Origin.ToString(),
+        settingsStore.Load().AllowedOrigins))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers[PrivateNetworkAccessPolicy.ResponseHeaderName] = "true";
+            return Task.CompletedTask;
+        });
+    }
+
+    await next();
+});
+
+app.UseCors(LocalCorsPolicy.PolicyName);
 
 app.MapGet("/", () => ApiResponse<HealthInfo>.Ok(new HealthInfo(true, "zytxt-dotnet-print", "http")));
 
@@ -34,6 +68,7 @@ app.MapGet("/settings-ui", (HttpRequest request) =>
 {
     var settings = settingsStore.Load();
     var printers = GetPrinterInfos(settings);
+    var previewTemplate = GetPreviewTemplate(request);
     var statusMessage = request.Query.ContainsKey("saved")
         ? "设置已保存，GDI 预览已按当前偏移刷新。"
         : request.Query.ContainsKey("printed")
@@ -41,24 +76,23 @@ app.MapGet("/settings-ui", (HttpRequest request) =>
             : request.Query.ContainsKey("axisPrinted")
                 ? "坐标测试页已发送到本地打印机。"
                 : "";
-    return Results.Content(settingsPageRenderer.Render(settings, printers, statusMessage), "text/html; charset=utf-8");
+    return Results.Content(settingsPageRenderer.Render(settings, printers, statusMessage, previewTemplate), "text/html; charset=utf-8");
 });
 
 app.MapPost("/settings-ui", async (HttpRequest request) =>
 {
     var form = await request.ReadFormAsync();
+    var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
-    settings.DefaultPrinter = form["defaultPrinter"].ToString();
-    settings.LabelOffset = new LabelOffset(
-        TryParseMillimeter(form["offsetX"].ToString(), out var offsetX) ? offsetX : 0m,
-        TryParseMillimeter(form["offsetY"].ToString(), out var offsetY) ? offsetY : 0m);
+    ApplySettingsForm(settings, form);
     settingsStore.Save(settings);
-    return Results.Redirect("/settings-ui?saved=1");
+    return Results.Redirect($"/settings-ui?saved=1&previewTemplate={previewTemplate}");
 });
 
 app.MapPost("/settings-ui/test-print", async (HttpRequest request) =>
 {
     var form = await request.ReadFormAsync();
+    var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
     ApplySettingsForm(settings, form);
     settingsStore.Save(settings);
@@ -66,17 +100,17 @@ app.MapPost("/settings-ui/test-print", async (HttpRequest request) =>
     try
     {
         var selectedPrinterName = printerSelectionResolver.Resolve(settings);
-        var labelPlan = labelPlanner.CreatePlan(CreatePreviewLabelItem());
+        var labelPlan = labelPlanner.CreatePlan(CreatePreviewLabelItem(previewTemplate));
         var drawingPlan = nativeDrawingPlanner.CreatePlan(labelPlan, settings.LabelOffset);
         printEngine.Print(drawingPlan, selectedPrinterName);
 
-        return Results.Redirect("/settings-ui?printed=1");
+        return Results.Redirect($"/settings-ui?printed=1&previewTemplate={previewTemplate}");
     }
     catch (Exception ex)
     {
         var printers = GetPrinterInfos(settings);
         return Results.Content(
-            settingsPageRenderer.Render(settings, printers, $"测试打印失败：{ex.Message}"),
+            settingsPageRenderer.Render(settings, printers, $"测试打印失败：{ex.Message}", previewTemplate),
             "text/html; charset=utf-8",
             statusCode: StatusCodes.Status500InternalServerError);
     }
@@ -85,6 +119,7 @@ app.MapPost("/settings-ui/test-print", async (HttpRequest request) =>
 app.MapPost("/settings-ui/test-axis-print", async (HttpRequest request) =>
 {
     var form = await request.ReadFormAsync();
+    var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
     ApplySettingsForm(settings, form);
     settingsStore.Save(settings);
@@ -97,42 +132,45 @@ app.MapPost("/settings-ui/test-axis-print", async (HttpRequest request) =>
             selectedPrinterName,
             ParsePrintMode(request.Query["mode"].ToString()));
 
-        return Results.Redirect("/settings-ui?axisPrinted=1");
+        return Results.Redirect($"/settings-ui?axisPrinted=1&previewTemplate={previewTemplate}");
     }
     catch (Exception ex)
     {
         var printers = GetPrinterInfos(settings);
         return Results.Content(
-            settingsPageRenderer.Render(settings, printers, $"坐标测试打印失败：{ex.Message}"),
+            settingsPageRenderer.Render(settings, printers, $"坐标测试打印失败：{ex.Message}", previewTemplate),
             "text/html; charset=utf-8",
             statusCode: StatusCodes.Status500InternalServerError);
     }
 });
 
-app.MapGet("/preview", () =>
+app.MapGet("/preview", (HttpRequest request) =>
 {
-    return Results.Content(gdiPreviewPageRenderer.Render("/preview/gdi.png", "/preview/html"), "text/html; charset=utf-8");
+    var previewTemplate = GetPreviewTemplate(request);
+    return Results.Content(
+        gdiPreviewPageRenderer.Render($"/preview/gdi.png?template={previewTemplate}", $"/preview/html?template={previewTemplate}"),
+        "text/html; charset=utf-8");
 });
 
-app.MapGet("/preview/html", () =>
+app.MapGet("/preview/html", (HttpRequest request) =>
 {
-    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem());
+    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem(GetPreviewTemplate(request)));
 
     return Results.Content(previewRenderer.Render(plan), "text/html; charset=utf-8");
 });
 
-app.MapGet("/preview/native-plan", () =>
+app.MapGet("/preview/native-plan", (HttpRequest request) =>
 {
     var settings = settingsStore.Load();
-    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem());
+    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem(GetPreviewTemplate(request)));
 
     return ApiResponse<NativeLabelDrawingPlan>.Ok(nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset));
 });
 
-app.MapGet("/preview/gdi.png", () =>
+app.MapGet("/preview/gdi.png", (HttpRequest request) =>
 {
     var settings = settingsStore.Load();
-    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem());
+    var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem(GetPreviewTemplate(request)));
     var drawingPlan = nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset);
     return Results.File(printEngine.RenderPreviewPng(drawingPlan), "image/png");
 });
@@ -195,7 +233,18 @@ app.MapPost("/print/tag", (PrintTagRequest request) =>
         PrintJobResult.CreateAccepted(jobId, requestId, request.Items.Count)));
 });
 
-app.Run();
+try
+{
+    Console.WriteLine($"ZYTXT Print Client is running at {listenUrl}");
+    Console.WriteLine($"Settings UI: {listenUrl.TrimEnd('/')}/settings-ui");
+    app.Run();
+}
+catch (Exception ex)
+{
+    WriteStartupError(dataDir, ex);
+    ShowStartupError(listenUrl, dataDir, ex);
+    throw;
+}
 
 static IReadOnlyList<string> GetInstalledPrinterNames()
 {
@@ -247,21 +296,47 @@ static void ApplySettingsForm(PrintClientSettings settings, IFormCollection form
     settings.LabelOffset = new LabelOffset(
         TryParseMillimeter(form["offsetX"].ToString(), out var offsetX) ? offsetX : settings.LabelOffset.X,
         TryParseMillimeter(form["offsetY"].ToString(), out var offsetY) ? offsetY : settings.LabelOffset.Y);
+
+    if (form.ContainsKey("allowedOrigins"))
+    {
+        settings.AllowedOrigins = AllowedOriginParser.Parse(form["allowedOrigins"].ToString());
+    }
 }
 
-static LabelItem CreatePreviewLabelItem()
+static string GetPreviewTemplate(HttpRequest request, IFormCollection? form = null)
+{
+    var value = form?["previewTemplate"].ToString();
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        value = request.Query["previewTemplate"].ToString();
+    }
+
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        value = request.Query["template"].ToString();
+    }
+
+    return string.Equals(value, "silver", StringComparison.OrdinalIgnoreCase)
+        ? "silver"
+        : "default";
+}
+
+static LabelItem CreatePreviewLabelItem(string previewTemplate = "default")
 {
     return new LabelItem
     {
+        FactoryNo = previewTemplate == "silver" ? 25003 : null,
         IdentifierCode = "1000035933",
         ProductName = "足银镀金串珠-四方拉丝隔珠11.5mm41镶四方拉丝mm41镶四方拉丝99999",
         WeightCategory = "净金重",
         FinishedProductWeight = 123m,
         RoughWeight = 123m,
         SalesCode = "60318000ZB60",
-        GoldPurity = "含金量999‰",
+        GoldPurity = "含金量990‰",
         Address = "水贝金座一层1111民族工匠",
+        Price = 1299m,
         AdditionalPrice = 430m,
+        TagWeight = 0.2m,
         CategoryName = "錾刻ZB",
         FinishedProductPartVO =
         [
@@ -278,4 +353,48 @@ static LabelItem CreatePreviewLabelItem()
         RopeWeight = 0.30m,
         FinishedProductNote = "1111111"
     };
+
+}
+
+static void WriteStartupError(string dataDir, Exception exception)
+{
+    try
+    {
+        Directory.CreateDirectory(dataDir);
+        var logPath = Path.Combine(dataDir, "startup-error.log");
+        File.AppendAllText(
+            logPath,
+            $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}]{Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}");
+    }
+    catch
+    {
+        // Startup diagnostics must never hide the original startup failure.
+    }
+}
+
+static void ShowStartupError(string listenUrl, string dataDir, Exception exception)
+{
+    if (!Environment.UserInteractive
+        || string.Equals(Environment.GetEnvironmentVariable("ZYTXT_PRINT_SUPPRESS_DIALOG"), "1", StringComparison.Ordinal))
+    {
+        return;
+    }
+
+    try
+    {
+        var message = $"本地打印服务启动失败。{Environment.NewLine}{Environment.NewLine}"
+            + $"监听地址: {listenUrl}{Environment.NewLine}"
+            + $"常见原因: 端口 37122 已被占用，或系统网络组件异常。{Environment.NewLine}"
+            + $"错误日志: {Path.Combine(dataDir, "startup-error.log")}{Environment.NewLine}{Environment.NewLine}"
+            + exception.Message;
+        System.Windows.Forms.MessageBox.Show(
+            message,
+            "ZYTXT Print Client",
+            System.Windows.Forms.MessageBoxButtons.OK,
+            System.Windows.Forms.MessageBoxIcon.Error);
+    }
+    catch
+    {
+        // Console/file diagnostics are enough if a message box cannot be shown.
+    }
 }

@@ -7,29 +7,59 @@ public sealed class LabelRenderPlanner
 {
     public LabelRenderPlan CreatePlan(LabelItem item)
     {
+        var templateKey = item.FactoryNo == 25003
+            ? LabelTemplateKey.Silver80x30
+            : LabelTemplateKey.Default80x30;
         var weightCategory = string.IsNullOrWhiteSpace(item.WeightCategory) ? "成品重" : item.WeightCategory.Trim();
         var purity = string.IsNullOrWhiteSpace(item.GoldPurity) ? "" : item.GoldPurity.Trim();
         var parts = CreateParts(item);
 
         return new LabelRenderPlan(
             LabelPaperSize.Create80x30(),
+            templateKey,
             item.IdentifierCode.Trim(),
             item.ProductName.Trim(),
             $"{weightCategory}(g): {FormatWeight(item.FinishedProductWeight)}",
-            $"总件重(g): {FormatWeight(item.RoughWeight)}",
+            templateKey == LabelTemplateKey.Silver80x30
+                ? $"总重(g): {FormatWeight(item.RoughWeight)}"
+                : $"总件重(g): {FormatWeight(item.RoughWeight)}",
             item.SalesCode.Trim(),
-            string.IsNullOrWhiteSpace(purity) ? "执行标准QB/T2062 GB11887" : $"执行标准QB/T2062 GB11887  {purity}",
+            CreateStandardText(templateKey, purity),
             string.IsNullOrWhiteSpace(item.Address) ? "地址:" : $"地址:{item.Address.Trim()}",
             item.IdentifierCode.Trim(),
             purity,
-            item.AdditionalPrice > 0 ? $"附加:￥{FormatWeight(item.AdditionalPrice)}" : "",
+            item.Price > 0 ? $"￥{FormatWeight(item.Price)}" : "",
+            CreateAdditionalPriceText(templateKey, item.AdditionalPrice),
+            item.TagWeight > 0 ? FormatWeight(item.TagWeight) : "0.20",
             parts,
             CreateFooterText(item));
     }
 
+    private static string CreateStandardText(LabelTemplateKey templateKey, string purity)
+    {
+        if (templateKey == LabelTemplateKey.Silver80x30)
+        {
+            return "执行标准QB/T2062 GB11887";
+        }
+
+        return string.IsNullOrWhiteSpace(purity)
+            ? "执行标准QB/T2062 GB11887"
+            : $"执行标准QB/T2062 GB11887  {purity}";
+    }
+
+    private static string CreateAdditionalPriceText(LabelTemplateKey templateKey, decimal additionalPrice)
+    {
+        if (additionalPrice <= 0)
+        {
+            return "";
+        }
+
+        return $"附加:￥{FormatWeight(additionalPrice)}";
+    }
+
     private static IReadOnlyList<LabelPartRenderPlan> CreateParts(LabelItem item)
     {
-        if (item.FinishedProductPartVO.Count > 0)
+        if (item.FinishedProductPartVO?.Count > 0)
         {
             return item.FinishedProductPartVO
                 .Take(9)
