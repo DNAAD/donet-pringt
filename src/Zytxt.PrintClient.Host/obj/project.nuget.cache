@@ -1,15 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "tikSylVtZjk=",
+  "dgSpecHash": "iGEloEmDR28=",
   "success": true,
   "projectFilePath": "D:\\sales_system\\dotnet-print\\src\\Zytxt.PrintClient.Host\\Zytxt.PrintClient.Host.csproj",
   "expectedPackageFiles": [
     "D:\\sales_system\\.nuget_packages\\microsoft.win32.systemevents\\6.0.0\\microsoft.win32.systemevents.6.0.0.nupkg.sha512",
     "D:\\sales_system\\.nuget_packages\\qrcoder\\1.8.0\\qrcoder.1.8.0.nupkg.sha512",
-    "D:\\sales_system\\.nuget_packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512",
-    "D:\\sales_system\\.nuget_packages\\microsoft.netcore.app.runtime.win-x64\\8.0.27\\microsoft.netcore.app.runtime.win-x64.8.0.27.nupkg.sha512",
-    "D:\\sales_system\\.nuget_packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.27\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.27.nupkg.sha512",
-    "D:\\sales_system\\.nuget_packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.27\\microsoft.aspnetcore.app.runtime.win-x64.8.0.27.nupkg.sha512"
+    "D:\\sales_system\\.nuget_packages\\system.drawing.common\\6.0.0\\system.drawing.common.6.0.0.nupkg.sha512"
   ],
   "logs": []
 }

@@ -11,4 +11,5 @@ public sealed record NativeDrawCommand(
     bool Bold,
     decimal RotationDegrees = 0m,
     int MaxLines = 0,
-    bool Ellipsis = false);
+    bool Ellipsis = false,
+    string ElementKey = "");

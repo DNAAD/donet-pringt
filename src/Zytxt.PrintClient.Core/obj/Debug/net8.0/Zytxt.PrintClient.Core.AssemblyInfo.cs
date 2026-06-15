@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Zytxt.PrintClient.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+601982c42d7b8960c55492c512e8dc0f536d419e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+22a5badbdc1969cd43d71a72b24ede95d029367e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Zytxt.PrintClient.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Zytxt.PrintClient.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -84,7 +84,7 @@ app.MapPost("/settings-ui", async (HttpRequest request) =>
     var form = await request.ReadFormAsync();
     var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
-    ApplySettingsForm(settings, form);
+    SettingsFormApplier.Apply(settings, form, previewTemplate);
     settingsStore.Save(settings);
     return Results.Redirect($"/settings-ui?saved=1&previewTemplate={previewTemplate}");
 });
@@ -94,14 +94,14 @@ app.MapPost("/settings-ui/test-print", async (HttpRequest request) =>
     var form = await request.ReadFormAsync();
     var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
-    ApplySettingsForm(settings, form);
+    SettingsFormApplier.Apply(settings, form, previewTemplate);
     settingsStore.Save(settings);
 
     try
     {
         var selectedPrinterName = printerSelectionResolver.Resolve(settings);
         var labelPlan = labelPlanner.CreatePlan(CreatePreviewLabelItem(previewTemplate));
-        var drawingPlan = nativeDrawingPlanner.CreatePlan(labelPlan, settings.LabelOffset);
+        var drawingPlan = nativeDrawingPlanner.CreatePlan(labelPlan, settings.LabelOffset, GetTemplateOverrides(settings, labelPlan.TemplateKey));
         printEngine.Print(drawingPlan, selectedPrinterName);
 
         return Results.Redirect($"/settings-ui?printed=1&previewTemplate={previewTemplate}");
@@ -121,7 +121,7 @@ app.MapPost("/settings-ui/test-axis-print", async (HttpRequest request) =>
     var form = await request.ReadFormAsync();
     var previewTemplate = GetPreviewTemplate(request, form);
     var settings = settingsStore.Load();
-    ApplySettingsForm(settings, form);
+    SettingsFormApplier.Apply(settings, form, previewTemplate);
     settingsStore.Save(settings);
 
     try
@@ -164,14 +164,14 @@ app.MapGet("/preview/native-plan", (HttpRequest request) =>
     var settings = settingsStore.Load();
     var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem(GetPreviewTemplate(request)));
 
-    return ApiResponse<NativeLabelDrawingPlan>.Ok(nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset));
+    return ApiResponse<NativeLabelDrawingPlan>.Ok(nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset, GetTemplateOverrides(settings, plan.TemplateKey)));
 });
 
 app.MapGet("/preview/gdi.png", (HttpRequest request) =>
 {
     var settings = settingsStore.Load();
     var plan = labelPlanner.CreatePlan(CreatePreviewLabelItem(GetPreviewTemplate(request)));
-    var drawingPlan = nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset);
+    var drawingPlan = nativeDrawingPlanner.CreatePlan(plan, settings.LabelOffset, GetTemplateOverrides(settings, plan.TemplateKey));
     return Results.File(printEngine.RenderPreviewPng(drawingPlan), "image/png");
 });
 
@@ -217,7 +217,7 @@ app.MapPost("/print/tag", (PrintTagRequest request) =>
     foreach (var item in request.Items)
     {
         var labelPlan = labelPlanner.CreatePlan(item);
-        var drawingPlan = nativeDrawingPlanner.CreatePlan(labelPlan, settings.LabelOffset);
+        var drawingPlan = nativeDrawingPlanner.CreatePlan(labelPlan, settings.LabelOffset, GetTemplateOverrides(settings, labelPlan.TemplateKey));
         if (request.ExecutePrint)
         {
             printEngine.Print(drawingPlan, selectedPrinterName);
@@ -268,12 +268,6 @@ static IReadOnlyList<PrinterInfo> GetPrinterInfos(PrintClientSettings settings)
         .ToList();
 }
 
-static bool TryParseMillimeter(string value, out decimal result)
-{
-    return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result)
-        || decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out result);
-}
-
 static LabelPrintMode ParsePrintMode(string value)
 {
     return value switch
@@ -286,22 +280,19 @@ static LabelPrintMode ParsePrintMode(string value)
     };
 }
 
-static void ApplySettingsForm(PrintClientSettings settings, IFormCollection form)
+static IReadOnlyDictionary<string, TemplateElementOverride>? GetTemplateOverrides(PrintClientSettings settings, LabelTemplateKey templateKey)
 {
-    if (form.ContainsKey("defaultPrinter"))
-    {
-        settings.DefaultPrinter = form["defaultPrinter"].ToString();
-    }
-
-    settings.LabelOffset = new LabelOffset(
-        TryParseMillimeter(form["offsetX"].ToString(), out var offsetX) ? offsetX : settings.LabelOffset.X,
-        TryParseMillimeter(form["offsetY"].ToString(), out var offsetY) ? offsetY : settings.LabelOffset.Y);
-
-    if (form.ContainsKey("allowedOrigins"))
-    {
-        settings.AllowedOrigins = AllowedOriginParser.Parse(form["allowedOrigins"].ToString());
-    }
+    return settings.TemplateOverrides is not null
+        && settings.TemplateOverrides.TryGetValue(NormalizeTemplateOverrideKey(templateKey), out var overrides)
+        ? overrides
+        : null;
 }
+
+static string NormalizeTemplateOverrideKey(LabelTemplateKey templateKey)
+{
+    return templateKey == LabelTemplateKey.Silver80x30 ? "silver" : "default";
+}
+
 
 static string GetPreviewTemplate(HttpRequest request, IFormCollection? form = null)
 {

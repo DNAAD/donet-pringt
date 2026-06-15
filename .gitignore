@@ -10,3 +10,4 @@ obj/
 .runtime-cors-settings-test/
 .runtime-pna-test/
 .runtime-port-conflict-test/
+tests/

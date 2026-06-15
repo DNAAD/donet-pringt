@@ -7,4 +7,6 @@ public sealed class PrintClientSettings
     public LabelOffset LabelOffset { get; set; } = new(0m, 0m);
 
     public List<string> AllowedOrigins { get; set; } = [];
+
+    public Dictionary<string, Dictionary<string, TemplateElementOverride>> TemplateOverrides { get; set; } = [];
 }

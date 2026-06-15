@@ -5,6 +5,8 @@ using Zytxt.PrintClient.Core.Labels;
 using Zytxt.PrintClient.Core.NativeDrawing;
 using Zytxt.PrintClient.Core.Api;
 using Zytxt.PrintClient.Core.Qr;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using Zytxt.PrintClient.Host.Printing;
 using Zytxt.PrintClient.Host.Security;
 using Zytxt.PrintClient.Host.Settings;
@@ -14,6 +16,7 @@ var tests = new List<(string Name, Action Test)>
     ("LabelPaperSize.Create80x30 exposes millimeters and hundredths of an inch", TestLabelPaperSize80x30),
     ("FileSettingsStore returns safe defaults when settings file is missing", TestSettingsDefaults),
     ("FileSettingsStore persists printer, label offset, and allowed origins", TestSettingsPersistence),
+    ("FileSettingsStore persists template element overrides", TestSettingsTemplateOverridePersistence),
     ("LocalCorsPolicy allows browser calls from localhost and loopback frontends", TestLocalCorsPolicy),
     ("PrivateNetworkAccessPolicy only allows trusted private-network preflights", TestPrivateNetworkAccessPolicy),
     ("AllowedOriginParser normalizes settings UI CORS origins", TestAllowedOriginParser),
@@ -27,13 +30,19 @@ var tests = new List<(string Name, Action Test)>
     ("GdiPreviewPageRenderer embeds the GDI PNG preview as the visible label", TestGdiPreviewPageRenderer),
     ("SettingsPageRenderer exposes printer selection, calibration preview, and test print", TestSettingsPageRendererCalibrationWorkbench),
     ("SettingsPageRenderer can switch GDI preview templates", TestSettingsPageRendererPreviewTemplateSwitch),
+    ("SettingsPageRenderer exposes template element editor controls", TestSettingsPageRendererTemplateEditor),
+    ("SettingsPageRenderer exposes preview zoom and template safety controls", TestSettingsPageRendererTemplateSafetyControls),
+    ("SettingsFormApplier clamps template element values", TestSettingsFormApplierClampsTemplateElementValues),
+    ("SettingsFormApplier resets the selected template element override", TestSettingsFormApplierResetsTemplateElementOverride),
     ("WindowsLabelPrintEngine renders GDI preview on the full 80x30 label canvas", TestWindowsLabelPrintEngineFullLabelPreview),
     ("WindowsLabelPrintEngine configures default print as direct 80x30", TestWindowsLabelPrintEngineDefaultPrintPage),
     ("WindowsLabelPrintEngine exposes axis diagnostic print mode variants", TestWindowsLabelPrintEnginePrintModeVariants),
     ("WindowsLabelPrintEngine renders print path through a pre-rotated feed canvas", TestWindowsLabelPrintEnginePreRotatedPrintPathPreview),
     ("AxisDiagnosticDrawingPlanner emits corner and direction markers", TestAxisDiagnosticDrawingPlan),
     ("NativeLabelDrawingPlanner emits millimeter-based drawing commands", TestNativeDrawingPlan),
+    ("NativeLabelDrawingPlanner applies template element overrides", TestNativeDrawingPlanTemplateOverrides),
     ("NativeLabelDrawingPlanner emits silver label commands for factory 25003", TestNativeDrawingPlanSilverTemplate),
+    ("NativeLabelDrawingPlanner applies silver template element overrides", TestNativeDrawingPlanSilverTemplateOverrides),
     ("NativeLabelDrawingPlanner keeps footer below dense part rows", TestNativeDrawingPlanKeepsFooterBelowPartRows),
     ("NativeLabelDrawingPlanner applies saved label offset to every command", TestNativeDrawingPlanOffset),
     ("QrCodeMatrixRenderer creates a real QR module matrix for label payloads", TestQrCodeMatrixRenderer),
@@ -107,6 +116,37 @@ static void TestSettingsPersistence()
     AssertEqual(expected.AllowedOrigins.Count, actual.AllowedOrigins.Count, "AllowedOrigins.Count");
     AssertEqual(expected.AllowedOrigins[0], actual.AllowedOrigins[0], "AllowedOrigins[0]");
     AssertEqual(expected.AllowedOrigins[1], actual.AllowedOrigins[1], "AllowedOrigins[1]");
+}
+
+static void TestSettingsTemplateOverridePersistence()
+{
+    var settingsPath = BuildTestSettingsPath();
+    var store = new FileSettingsStore(settingsPath);
+    var expected = new PrintClientSettings
+    {
+        TemplateOverrides = new Dictionary<string, Dictionary<string, TemplateElementOverride>>
+        {
+            ["default"] = new()
+            {
+                ["productName"] = new TemplateElementOverride
+                {
+                    X = 10.8m,
+                    Y = 0.4m,
+                    FontSizePt = 4.9m,
+                    Bold = true
+                }
+            }
+        }
+    };
+
+    store.Save(expected);
+    var actual = store.Load();
+    var productName = actual.TemplateOverrides["default"]["productName"];
+
+    AssertEqual(10.8m, productName.X, "TemplateOverride.X");
+    AssertEqual(0.4m, productName.Y, "TemplateOverride.Y");
+    AssertEqual(4.9m, productName.FontSizePt, "TemplateOverride.FontSizePt");
+    AssertEqual(true, productName.Bold, "TemplateOverride.Bold");
 }
 
 static void TestLocalCorsPolicy()
@@ -360,6 +400,12 @@ static void TestSettingsPageRendererCalibrationWorkbench()
     AssertContains(html, "mode=feed0", "axis feed0 mode");
     AssertContains(html, "href=\"/diagnostics/axis.png\"", "axis diagnostic preview link");
     AssertContains(html, "href=\"/diagnostics/axis-print-path.png\"", "axis print path preview link");
+    AssertContains(html, "class=\"settings-shell\"", "settings shell layout");
+    AssertContains(html, "class=\"settings-column settings-column-left\"", "left settings column");
+    AssertContains(html, "class=\"preview-stage\"", "central preview stage");
+    AssertContains(html, "class=\"template-sidebar\"", "template editor sidebar");
+    AssertContains(html, "打印机与连接", "printer connection panel title");
+    AssertContains(html, "校准与测试", "calibration panel title");
 }
 
 static void TestSettingsPageRendererPreviewTemplateSwitch()
@@ -375,6 +421,109 @@ static void TestSettingsPageRendererPreviewTemplateSwitch()
     AssertContains(html, "formaction=\"/settings-ui/test-print\"", "test print action");
     AssertContains(html, "href=\"/preview/native-plan?template=silver\"", "native plan link");
     AssertContains(html, "href=\"/preview/html?template=silver\"", "html preview link");
+}
+
+static void TestSettingsPageRendererTemplateEditor()
+{
+    var renderer = new SettingsPageRenderer();
+    var settings = new PrintClientSettings
+    {
+        TemplateOverrides = new Dictionary<string, Dictionary<string, TemplateElementOverride>>
+        {
+            ["default"] = new()
+            {
+                ["productName"] = new TemplateElementOverride
+                {
+                    X = 10.8m,
+                    Y = 0.4m,
+                    FontSizePt = 4.9m,
+                    Bold = true
+                }
+            }
+        }
+    };
+
+    var html = renderer.Render(settings, [], previewTemplate: "default");
+
+    AssertContains(html, "name=\"templateElementKey\"", "template element select");
+    AssertContains(html, "value=\"productName\" selected", "product name selected");
+    AssertContains(html, "name=\"templateX\"", "template x input");
+    AssertContains(html, "value=\"10.8\"", "template x value");
+    AssertContains(html, "name=\"templateY\"", "template y input");
+    AssertContains(html, "value=\"0.4\"", "template y value");
+    AssertContains(html, "name=\"templateFontSizePt\"", "template font size input");
+    AssertContains(html, "value=\"4.9\"", "template font size value");
+    AssertContains(html, "name=\"templateBold\" type=\"checkbox\" checked", "template bold checked");
+}
+
+static void TestSettingsPageRendererTemplateSafetyControls()
+{
+    var renderer = new SettingsPageRenderer();
+    var html = renderer.Render(new PrintClientSettings(), [], previewTemplate: "default");
+
+    AssertContains(html, "name=\"previewZoom\"", "preview zoom control");
+    AssertContains(html, "id=\"previewZoomValue\"", "preview zoom percentage label");
+    AssertContains(html, "name=\"templateReset\" value=\"current\"", "reset current template element button");
+    AssertContains(html, "name=\"templateX\" type=\"number\" step=\"0.1\" min=\"0\" max=\"80\"", "template x range");
+    AssertContains(html, "name=\"templateY\" type=\"number\" step=\"0.1\" min=\"0\" max=\"30\"", "template y range");
+    AssertContains(html, "name=\"templateFontSizePt\" type=\"number\" step=\"0.1\" min=\"1\" max=\"12\"", "template font range");
+}
+
+static void TestSettingsFormApplierClampsTemplateElementValues()
+{
+    var settings = new PrintClientSettings();
+    var form = BuildForm(new Dictionary<string, string>
+    {
+        ["offsetX"] = "0",
+        ["offsetY"] = "0",
+        ["templateElementKey"] = "productName",
+        ["templateX"] = "-12",
+        ["templateY"] = "99",
+        ["templateFontSizePt"] = "42",
+        ["templateBold"] = "true"
+    });
+
+    SettingsFormApplier.Apply(settings, form, "default");
+    var productName = settings.TemplateOverrides["default"]["productName"];
+
+    AssertEqual(0m, productName.X, "TemplateOverride.X clamps to left edge");
+    AssertEqual(30m, productName.Y, "TemplateOverride.Y clamps to paper height");
+    AssertEqual(12m, productName.FontSizePt, "TemplateOverride.FontSizePt clamps to max");
+    AssertEqual(true, productName.Bold, "TemplateOverride.Bold");
+}
+
+static void TestSettingsFormApplierResetsTemplateElementOverride()
+{
+    var settings = new PrintClientSettings
+    {
+        TemplateOverrides = new Dictionary<string, Dictionary<string, TemplateElementOverride>>
+        {
+            ["default"] = new()
+            {
+                ["productName"] = new TemplateElementOverride
+                {
+                    X = 10.8m,
+                    Y = 0.4m,
+                    FontSizePt = 4.9m,
+                    Bold = true
+                }
+            }
+        }
+    };
+    var form = BuildForm(new Dictionary<string, string>
+    {
+        ["offsetX"] = "0",
+        ["offsetY"] = "0",
+        ["templateElementKey"] = "productName",
+        ["templateX"] = "10.8",
+        ["templateY"] = "0.4",
+        ["templateFontSizePt"] = "4.9",
+        ["templateReset"] = "current"
+    });
+
+    SettingsFormApplier.Apply(settings, form, "default");
+
+    AssertEqual(false, settings.TemplateOverrides.ContainsKey("default"), "Default template override removed when empty");
 }
 
 static void TestWindowsLabelPrintEngineFullLabelPreview()
@@ -513,6 +662,39 @@ static void TestNativeDrawingPlan()
     AssertEqual(false, partCommand.Bold, "PartCommand.Bold");
 }
 
+static void TestNativeDrawingPlanTemplateOverrides()
+{
+    var labelPlan = new LabelRenderPlanner().CreatePlan(new LabelItem
+    {
+        IdentifierCode = "10000000789",
+        ProductName = "足金镶嵌吊坠",
+        WeightCategory = "成品重",
+        FinishedProductWeight = 3.2m,
+        RoughWeight = 3.56m,
+        SalesCode = "XS-001",
+        GoldPurity = "足金999",
+        Address = "水贝金座"
+    });
+    var overrides = new Dictionary<string, TemplateElementOverride>
+    {
+        ["productName"] = new()
+        {
+            X = 11.1m,
+            Y = 0.6m,
+            FontSizePt = 4.9m,
+            Bold = true
+        }
+    };
+
+    var drawingPlan = new NativeLabelDrawingPlanner().CreatePlan(labelPlan, offset: null, overrides);
+    var productNameCommand = drawingPlan.Commands.Single(command => command.ElementKey == "productName");
+
+    AssertEqual(11.1m, productNameCommand.X, "ProductName.X");
+    AssertEqual(0.6m, productNameCommand.Y, "ProductName.Y");
+    AssertEqual(4.9m, productNameCommand.FontSizePt, "ProductName.FontSizePt");
+    AssertEqual(true, productNameCommand.Bold, "ProductName.Bold");
+}
+
 static void TestLabelPreviewHtmlRendererSilverTemplate()
 {
     var planner = new LabelRenderPlanner();
@@ -588,6 +770,41 @@ static void TestNativeDrawingPlanSilverTemplate()
     AssertTrue(drawingPlan.Commands.Any(command => command.Text.Contains("錾刻ZB:123.00", StringComparison.Ordinal)), "silver part without grams suffix");
     AssertEqual(labelPlan.IdentifierText, drawingPlan.Commands[^1].Text, "BottomCode.Text");
     AssertEqual(90m, drawingPlan.Commands[^1].RotationDegrees, "BottomCode.RotationDegrees");
+}
+
+static void TestNativeDrawingPlanSilverTemplateOverrides()
+{
+    var labelPlan = new LabelRenderPlanner().CreatePlan(new LabelItem
+    {
+        FactoryNo = 25003,
+        IdentifierCode = "100003593",
+        ProductName = "足银镀金串珠",
+        WeightCategory = "净金重",
+        FinishedProductWeight = 123m,
+        RoughWeight = 123m,
+        SalesCode = "60318000ZB60",
+        Price = 1299m,
+        AdditionalPrice = 430m,
+        CategoryName = "素金PD"
+    });
+    var overrides = new Dictionary<string, TemplateElementOverride>
+    {
+        ["roughWeightValue"] = new()
+        {
+            X = 19.4m,
+            Y = 9.2m,
+            FontSizePt = 5.6m,
+            Bold = false
+        }
+    };
+
+    var drawingPlan = new NativeLabelDrawingPlanner().CreatePlan(labelPlan, offset: null, overrides);
+    var roughWeightValueCommand = drawingPlan.Commands.Single(command => command.ElementKey == "roughWeightValue");
+
+    AssertEqual(19.4m, roughWeightValueCommand.X, "RoughWeightValue.X");
+    AssertEqual(9.2m, roughWeightValueCommand.Y, "RoughWeightValue.Y");
+    AssertEqual(5.6m, roughWeightValueCommand.FontSizePt, "RoughWeightValue.FontSizePt");
+    AssertEqual(false, roughWeightValueCommand.Bold, "RoughWeightValue.Bold");
 }
 
 static void TestNativeDrawingPlanKeepsFooterBelowPartRows()
@@ -749,6 +966,13 @@ static void AssertTrue(bool condition, string name)
     {
         throw new InvalidOperationException($"{name}: expected true");
     }
+}
+
+static FormCollection BuildForm(Dictionary<string, string> values)
+{
+    return new FormCollection(values.ToDictionary(
+        pair => pair.Key,
+        pair => new StringValues(pair.Value)));
 }
 
 static int CountDarkPixels(Bitmap bitmap)
